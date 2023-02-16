@@ -1,0 +1,8 @@
+# Dependencias
+node_modules/
+
+# Configurations Files
+credentials.json
+
+# Extra
+output.csv
