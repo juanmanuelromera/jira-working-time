@@ -25,7 +25,7 @@ You need to get a [Jira API Token](https://id.atlassian.com/manage-profile/secur
     ```
 3. Run the script
     ```sh
-    npm run
+    npm start
     ```   
 
 ## Configuration

@@ -45,6 +45,7 @@ async function getIssueStatusTime(issueKey) {
         let assignee = issue.fields.assignee == null ? "Unassigned" : issue.fields.assignee.displayName;
         let issuetype = issue.fields.issuetype.name;
         let resolutiondate = issue.fields.resolutiondate;
+        let epicKey = issue.fields.customfield_10007 ? issue.fields.customfield_10007 : "";
         let stateEndDate = new Date();
 
         for (let i = 0; i < histories.length; i++) {
@@ -59,6 +60,7 @@ async function getIssueStatusTime(issueKey) {
                         statusTime.push({
                             key: issueKey,
                             type: issuetype,
+                            epic: epicKey,
                             resolutiondate: resolutiondate,
                             status: currentState,
                             assignee,
@@ -108,6 +110,7 @@ function groupAndSum(data) {
             acc[curr.assignee] = {
                 key: curr.key,
                 type: curr.type,
+                epic: curr.epic,
                 resolutiondate: curr.resolutiondate,
                 assignee: curr.assignee,
                 time: 0
@@ -128,6 +131,7 @@ function writeCSV(data) {
         header: [
             { id: 'key', title: 'key' },
             { id: 'type', title: 'type' },
+            { id: 'epic', title: 'epic' },
             { id: 'resolutiondate', title: 'resolutiondate' },
             { id: 'assignee', title: 'assignee' },
             { id: 'time', title: 'time' }
