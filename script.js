@@ -1,6 +1,30 @@
 const axios = require('axios');
 const fs = require('fs');
+const moment = require('moment');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
+
+// Define work range
+const workHoursStart = 9;
+const workHoursEnd = 18;
+const holidays = [
+    '2022-01-01',
+    '2022-01-06',
+    '2022-04-14',
+    '2022-04-15',
+    '2022-05-02',
+    '2022-05-16',
+    '2022-07-25',
+    '2022-08-15',
+    '2022-10-12',
+    '2022-11-01',
+    '2022-11-09',
+    '2022-12-06',
+    '2022-12-08',
+    '2022-12-26'
+];
+const workingDays = [1, 2, 3, 4, 5];
+let parents = new Map();
+const NO_EPIC = 'No Epic';
 
 //Jira Credentials
 const jiraCredentials = fs.readFileSync('credentials.json');
@@ -16,8 +40,8 @@ const options = {
 // JIRA Query
 const jiraUrl = 'https://feverup.atlassian.net';
 const jiraApiUrl = `${jiraUrl}/rest/api/2`;
-const jqlQuery = "project IN (OPX) AND issuetype in (Story, Task, Sub-task, Bug) AND resolution = Done AND resolutiondate >= 2022-01-01 AND  resolutiondate <= 2022-12-31 ORDER BY resolutiondate DESC"
-const maxResults = 2000;
+const jqlQuery = "project IN (OPX) AND issuetype in (Story, Task, Sub-task, Bug) AND resolution IN (Done, Fixed) AND resolutiondate >= 2022-01-01 AND  resolutiondate <= 2022-12-31 ORDER BY resolutiondate DESC"
+const maxResults = 5000;
 const workingStatus = ["Study", "In Progress", "In Review", "Production check (DoD)"]
 
 
@@ -45,7 +69,9 @@ async function getIssueStatusTime(issueKey) {
         let assignee = issue.fields.assignee == null ? "Unassigned" : issue.fields.assignee.displayName;
         let issuetype = issue.fields.issuetype.name;
         let resolutiondate = issue.fields.resolutiondate;
-        let epicKey = issue.fields.customfield_10007 ? issue.fields.customfield_10007 : "";
+        let epicSummary = issue.fields?.parent?.fields?.summary ?? NO_EPIC;
+        let parentKey = issue.fields?.parent?.key ?? '';
+
         let stateEndDate = new Date();
 
         for (let i = 0; i < histories.length; i++) {
@@ -60,7 +86,10 @@ async function getIssueStatusTime(issueKey) {
                         statusTime.push({
                             key: issueKey,
                             type: issuetype,
-                            epic: epicKey,
+                            parentKey: parentKey,
+                            epic: epicSummary,
+                            startdate: stateStartDate,
+                            enddate: stateEndDate,
                             resolutiondate: resolutiondate,
                             status: currentState,
                             assignee,
@@ -70,13 +99,16 @@ async function getIssueStatusTime(issueKey) {
                         assignee = history.author.displayName;
                         stateEndDate = new Date(history.created);
 
+                        if (epicSummary !== NO_EPIC) {
+                            parents.set(issueKey, epicSummary);
+                        }
+
                     }
                 }
             }
         }
-        return groupAndSum(statusTime.filter((item) =>
-            workingStatus.includes(item.status)
-        ));
+        return statusTime.filter((item) =>
+            workingStatus.includes(item.status));
     } catch (error) {
         console.log(error);
         return [];
@@ -85,23 +117,35 @@ async function getIssueStatusTime(issueKey) {
 
 // Calculate Working Hours
 function getDiffTimeInWorkingHours(startDate, endDate) {
-    const startHour = 8;
-    const endHour = 20;
-    const workingDays = [1, 2, 3, 4, 5];
+    // Store minutes worked
+    var minutesWorked = 0;
 
-    let diffHours = 0;
-    let currentDate = new Date(startDate);
-    while (currentDate < endDate) {
-        const currentDay = currentDate.getDay();
-        const currentHour = currentDate.getHours();
+    // Validate input
+    if (endDate < startDate) { return 0; }
 
-        if (workingDays.includes(currentDay) && currentHour >= startHour && currentHour < endHour) {
-            diffHours++;
+    // Loop from your Start to End dates (by hour)
+    var current = new Date(startDate);
+
+    // Loop while currentDate is less than end Date (by minutes)
+    while (current <= endDate) {
+        // Is the current time within a work day (and if it 
+        // occurs on a weekend or not)          
+        if (workingDays.includes(current.getDay()) && current.getHours() >= workHoursStart && current.getHours() < workHoursEnd) {
+            if (!holidays.includes(moment(current).format('YYYY-MM-DD'))) {
+                minutesWorked++;
+                // Increment current time
+                current.setTime(current.getTime() + 1000 * 60);
+            } else {
+                current.setDate(current.getDate() + 1);
+                current.setHours(workHoursStart, 0, 0, 0);
+            }
+        } else {
+            // Increment current time
+            current.setTime(current.getTime() + 1000 * 60);
         }
-        //add 1 hour
-        currentDate.setTime(currentDate.getTime() + 60 * 60 * 1000);
     }
-    return diffHours.toFixed();
+    // Return the number of hours
+    return minutesWorked / 60;
 }
 
 function groupAndSum(data) {
@@ -111,12 +155,16 @@ function groupAndSum(data) {
                 key: curr.key,
                 type: curr.type,
                 epic: curr.epic,
+                startdate: Number.POSITIVE_INFINITY,
+                enddate: Number.NEGATIVE_INFINITY,
                 resolutiondate: curr.resolutiondate,
                 assignee: curr.assignee,
                 time: 0
             };
         }
-        acc[curr.assignee].time += parseInt(curr.time);
+        acc[curr.assignee].time += parseFloat(curr.time);
+        acc[curr.assignee].startdate = acc[curr.assignee].startdate > curr.startdate ? curr.startdate : acc[curr.assignee].startdate;
+        acc[curr.assignee].enddate = acc[curr.assignee].enddate < curr.enddate ? curr.enddate : acc[curr.assignee].enddate;
         return acc;
     }, {}));
     return result;
@@ -126,19 +174,28 @@ function groupAndSum(data) {
 // Write CSV
 function writeCSV(data) {
     const flatData = data.flat();
+    const finalData = flatData.map(item => {
+        if (item.parentKey && parents.has(item.parentKey)) {
+            item.epic = parents.get(item.parentKey);
+        }
+        return item;
+    });
     const csvWriter = createCsvWriter({
         path: 'output.csv',
         header: [
             { id: 'key', title: 'key' },
             { id: 'type', title: 'type' },
             { id: 'epic', title: 'epic' },
+            { id: 'status', title: 'status' },
+            { id: 'startdate', title: 'startdate' },
+            { id: 'enddate', title: 'enddate' },
             { id: 'resolutiondate', title: 'resolutiondate' },
             { id: 'assignee', title: 'assignee' },
             { id: 'time', title: 'time' }
         ]
     });
 
-    csvWriter.writeRecords(flatData)
+    csvWriter.writeRecords(finalData)
         .then(() => console.log('Success!'))
         .catch(error => console.log('Error', error));
 }
