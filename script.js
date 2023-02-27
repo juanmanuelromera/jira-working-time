@@ -42,7 +42,7 @@ const jiraUrl = 'https://feverup.atlassian.net';
 const jiraApiUrl = `${jiraUrl}/rest/api/2`;
 const jqlQuery = "project IN (OPX) AND issuetype in (Story, Task, Sub-task, Bug) AND resolution IN (Done, Fixed) AND resolutiondate >= 2022-01-01 AND  resolutiondate <= 2022-12-31 ORDER BY resolutiondate DESC"
 const maxResults = 5000;
-const workingStatus = ["Study", "In Progress", "In Review", "Production check (DoD)"]
+const workingStatus = ["Study", "In Progress", "In Review"]
 
 
 // Get Issues From Query
