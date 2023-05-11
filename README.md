@@ -14,6 +14,34 @@ You need to get a [Jira API Token](https://id.atlassian.com/manage-profile/secur
 }
 ```
 
+You have to create a configuration file
+```json
+{
+    "jqlQuery": "",
+    "workingStatus": "",
+    "maxResults": ""
+}
+```
+
+##### JQL Query
+In the `jqlQuery` you have to introduce a JQL Query about the issues that you are interested to get the working times.
+
+Example:
+```js
+"project IN (OPX) AND issuetype in (Story, Task, Sub-task, Bug) AND resolution = Done AND resolutiondate >= 2022-01-01 AND  resolutiondate <= 2022-12-31 ORDER BY resolutiondate DESC"
+```
+
+##### Working Status
+In the `workingStatus` you could define which are the status that you consider as working status in your Jira Workflow.
+
+Example:
+```js
+["Study", "In Progress", "In Review", "Production check (DoD)"]
+```
+
+##### Max Result
+In the `maxResult` you have to define a number of max results for you query.
+
 ### Installing
 1. Clone the Repository
     ```sh
@@ -25,28 +53,12 @@ You need to get a [Jira API Token](https://id.atlassian.com/manage-profile/secur
     ```
 3. Run the script
     ```sh
-    npm start
+    npm start [creadentials-file.json] [configuration-file.json]
     ```   
 
-## Configuration
-To configure your result you have to modify the script.js file.
+To replace the arguments, input the path of the credentials and configuration file. Alternatively, you can leave the arguments blank and the script will automatically use the credentials.json and configuration.json files in the current folder.
 
-### JQL Query
-In the `jqlQuery` variable you have to introduce a JQL Query about the issues that you are interested to get the working times.
-
-Example:
-```js
-const jqlQuery = "project IN (OPX) AND issuetype in (Story, Task, Sub-task, Bug) AND resolution = Done 
-AND resolutiondate >= 2022-01-01 AND  resolutiondate <= 2022-12-31 ORDER BY resolutiondate DESC"
-```
-
-### Working States
-In the `workingStatus` variable you could define which are the status that you consider as working status in your Jira Workflow.
-
-Example:
-```js
-const workingStatus = ["Study", "In Progress", "In Review", "Production check (DoD)"]
-```
+The result is going to be saved in a output.csv file.
 
 ## Authors
 Juan Manuel Romera Ferrio

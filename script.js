@@ -1,7 +1,12 @@
 const axios = require('axios');
+const process = require('process');
 const fs = require('fs');
 const moment = require('moment');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
+
+// Retrieving the parameters
+const credentialsFile = process.argv[2] || 'credentials.json'
+const configurationFile = process.argv[3] || 'configuration.json'
 
 // Define work range
 const workHoursStart = 9;
@@ -27,7 +32,7 @@ let parents = new Map();
 const NO_EPIC = 'No Epic';
 
 //Jira Credentials
-const jiraCredentials = fs.readFileSync('credentials.json');
+const jiraCredentials = fs.readFileSync(credentialsFile);
 const { username, apiToken } = JSON.parse(jiraCredentials);
 const credentials = Buffer.from(`${username}:${apiToken}`).toString('base64');
 const options = {
@@ -40,10 +45,8 @@ const options = {
 // JIRA Query
 const jiraUrl = 'https://feverup.atlassian.net';
 const jiraApiUrl = `${jiraUrl}/rest/api/2`;
-const jqlQuery = "project IN (OPX) AND issuetype in (Story, Task, Sub-task, Bug) AND resolution IN (Done, Fixed) AND resolutiondate >= 2022-01-01 AND  resolutiondate <= 2022-12-31 ORDER BY resolutiondate DESC"
-const maxResults = 5000;
-const workingStatus = ["Study", "In Progress", "In Review"]
-
+const configuration = fs.readFileSync(configurationFile);
+const { jqlQuery, workingStatus, maxResults } = JSON.parse(configuration);
 
 // Get Issues From Query
 async function getIssues(jqlQuery, maxResults) {
